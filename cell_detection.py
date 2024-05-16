@@ -9,13 +9,14 @@ MAX_LENGTH = 250
 MAX_WIDTH = 250
 CENTER_X = int(MAX_WIDTH/2)
 CENTER_Y = int(MAX_LENGTH/2)
+SOURCE_CORD_X = 50
+SOURCE_CORD_Y = 45
 
 #Ze względu na wielkość point clouda muszę dać większą rozdzieczość
 RESOLUTION = 1
 
 memory_ogm = np.zeros((MAX_WIDTH, MAX_LENGTH))
 new_ogm = copy.deepcopy(memory_ogm)
-
 
 def load_csv(path_to_file: Path) -> np.array:
     data_list = []
@@ -25,13 +26,12 @@ def load_csv(path_to_file: Path) -> np.array:
             row = [float(i) for i in row]
 
             #Magical geometry math
-            row[0] = 50 - row[0]
-            row[1] = row[1] - 45
+            row[0] = SOURCE_CORD_X - row[0]
+            row[1] = row[1] - SOURCE_CORD_Y
             # Z is irrelevant
             # row = [a - b for a,b in zip([50, 45, 50], row)] #Camera Coords
             data_list.append(np.array(row))
     return np.array(data_list)     
-
 
 def fill_map_with_data(map, data):
     for point in data:
@@ -67,8 +67,8 @@ for i in range(MAX_WIDTH):
 
 plt.xlabel('Y')
 plt.ylabel('X')
-# plt.imshow(differece_map, interpolation="nearest",cmap='grey')
-# plt.colorbar()
+plt.imshow(differece_map, interpolation="nearest",cmap='grey')
+plt.colorbar()
 plt.imshow(differece_map)
 plt.show()
 
@@ -87,7 +87,7 @@ for i in range(MAX_WIDTH):
 
 plt.xlabel('Y')
 plt.ylabel('X')
-# plt.imshow(differece_map, interpolation="nearest",cmap='grey')
-# plt.colorbar()
+plt.imshow(differece_map, interpolation="nearest",cmap='grey')
+plt.colorbar()
 plt.imshow(differece_map)
 plt.show()
