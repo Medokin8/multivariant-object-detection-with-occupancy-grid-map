@@ -5,8 +5,10 @@ from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Header
 import numpy as np
 
-GRID_SIZE = 100
-RESOLUTION = 0.1
+#GRID_SIZE = 100
+#RESOLUTION = 0.1
+GRID_SIZE = 300
+RESOLUTION = 1.0
 
 # Parameters for log-odds
 P_OCCUPIED = 0.9
