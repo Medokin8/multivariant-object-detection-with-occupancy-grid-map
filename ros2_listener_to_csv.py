@@ -1,9 +1,8 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import OccupancyGrid
-from std_msgs.msg import Header
 import numpy as np
+import os
 
 GRID_SIZE = 100
 RESOLUTION = 0.1
@@ -26,10 +25,9 @@ class LaserListenerNode(Node):
             '/laser_scan',
             self.listener_callback,
             10)
-        self.grid_publisher = self.create_publisher(OccupancyGrid, 'occupancy_grid', 10)
         
-        self.timer = self.create_timer(1.0, self.publish_occupancy_grid)
-        
+        self.timer = self.create_timer(1.0, self.check_for_topic)
+
         # Initialize log-odds grid map with log-odds corresponding to 0.5 probability
         self.grid_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
         self.memory_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
@@ -83,42 +81,22 @@ class LaserListenerNode(Node):
                 self.grid_map[grid_x, grid_y] += (1 - 1 / (1 + np.exp(LOG_ODDS_OCCUPIED))) # = 1
                 self.grid_map[grid_x, grid_y] = np.clip(self.grid_map[grid_x, grid_y], P_MIN, P_MAX)
         
-        self.check_for_changes()
         self.last_scan_time = msg.header.stamp
 
+    def check_for_topic(self):
+        topics = self.get_topic_names_and_types()
+        if not any('/laser_scan' in topic for topic, types in topics):
+            self.get_logger().info('/laser_scan topic not found, shutting down...')
+            rclpy.shutdown()
 
-    def publish_occupancy_grid(self):
-        if self.last_scan_time is None:
-            return  # No scan data received yet
-
-        flipped_map = np.flip(self.grid_map, axis=0)
-        rotated_map = np.rot90(flipped_map, k=-1)
-
-        # Convert log-odds map to occupancy grid
-        occupancy_grid = OccupancyGrid()
-        occupancy_grid.header = Header()
-        occupancy_grid.header.stamp = self.last_scan_time
-        occupancy_grid.header.frame_id = 'sim_lidar'
-
-        occupancy_grid.info.resolution = RESOLUTION
-        occupancy_grid.info.width = GRID_SIZE
-        occupancy_grid.info.height = GRID_SIZE
-        occupancy_grid.info.origin.position.x = - (GRID_SIZE // 2) * RESOLUTION
-        occupancy_grid.info.origin.position.y = - (GRID_SIZE // 2) * RESOLUTION
-        occupancy_grid.info.origin.position.z = 0.0
-        occupancy_grid.info.origin.orientation.w = 1.0  # no rotation
-
-        # Convert log-odds to probabilities and then to occupancy values
-        probabilities = 1 - 1 / (1 + np.exp(rotated_map))
-        occupancy_grid.data = (probabilities * 100).astype(np.int8).flatten().tolist()
-
-        # Publish the occupancy grid
-        self.grid_publisher.publish(occupancy_grid)
-        self.get_logger().info('Occupancy grid published')
-
-        # Publish the change map
-        self.publish_changed_cells_grid()
-
+    def save_memory_map(self):
+        # Convert log-odds map to probabilities
+        folder_and_name = "simulated_maps/closed"
+        probabilities = 1 - 1 / (1 + np.exp(self.grid_map))
+        np.save(folder_and_name + ".npy", probabilities)
+        self.get_logger().info('Memory map saved to memory_map.npy')
+        np.savetxt(folder_and_name + ".csv", probabilities, delimiter=",")
+        self.get_logger().info('Memory map saved to memory_map.csv')
 
 def main(args=None):
     rclpy.init(args=args)
@@ -129,6 +107,7 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        node.save_memory_map()  # Save the memory map before shutting down
         node.destroy_node()
         rclpy.shutdown()
 
