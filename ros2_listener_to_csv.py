@@ -6,6 +6,8 @@ import os
 
 GRID_SIZE = 100
 RESOLUTION = 0.1
+# GRID_SIZE = 250
+# RESOLUTION = 1
 
 # Parameters for log-odds
 P_OCCUPIED = 0.9
@@ -91,7 +93,7 @@ class LaserListenerNode(Node):
 
     def save_memory_map(self):
         # Convert log-odds map to probabilities
-        folder_and_name = "simulated_maps/closed"
+        folder_and_name = "simulated_maps/lab15_main_and_side_opened"
         probabilities = 1 - 1 / (1 + np.exp(self.grid_map))
         np.save(folder_and_name + ".npy", probabilities)
         self.get_logger().info('Memory map saved to memory_map.npy')
