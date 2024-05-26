@@ -27,12 +27,14 @@ class LaserListenerNode(Node):
             self.listener_callback,
             10)
         self.grid_publisher = self.create_publisher(OccupancyGrid, 'occupancy_grid', 10)
+        self.change_publisher = self.create_publisher(OccupancyGrid, 'changed_cells_grid', 10)
         
         self.timer = self.create_timer(1.0, self.publish_occupancy_grid)
         
         # Initialize log-odds grid map with log-odds corresponding to 0.5 probability
         self.grid_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
         self.memory_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
+        self.change_map = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int8)
 
         # Origin of the grid map (assuming robot starts at the center)
         self.origin_x = GRID_SIZE // 2
@@ -63,6 +65,17 @@ class LaserListenerNode(Node):
             if e2 < dx:
                 err += dx
                 y0 += sy
+
+    def check_for_changes(self):
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                current_prob = self.grid_map[i, j]
+                previous_prob = self.memory_map[i, j]
+                if previous_prob > 0.5 and current_prob < 0.5:
+                    self.change_map[i, j] = 100  # Mark the cell as changed
+                
+        self.memory_map = np.copy(self.grid_map)
+
 
     def listener_callback(self, msg):
         for i, range in enumerate(msg.ranges):
@@ -118,6 +131,30 @@ class LaserListenerNode(Node):
 
         # Publish the change map
         self.publish_changed_cells_grid()
+
+
+    def publish_changed_cells_grid(self):
+        flipped_change_map = np.flip(self.change_map, axis=0)
+        rotated_change_map = np.rot90(flipped_change_map, k=-1)
+
+        change_grid = OccupancyGrid()
+        change_grid.header = Header()
+        change_grid.header.stamp = self.last_scan_time
+        change_grid.header.frame_id = 'sim_lidar'
+
+        change_grid.info.resolution = RESOLUTION
+        change_grid.info.width = GRID_SIZE
+        change_grid.info.height = GRID_SIZE
+        change_grid.info.origin.position.x = - (GRID_SIZE // 2) * RESOLUTION
+        change_grid.info.origin.position.y = - (GRID_SIZE // 2) * RESOLUTION
+        change_grid.info.origin.position.z = 0.0
+        change_grid.info.origin.orientation.w = 1.0  # no rotation
+
+        change_grid.data = rotated_change_map.flatten().tolist()
+
+        # Publish the change grid
+        self.change_publisher.publish(change_grid)
+        self.get_logger().info('Changed cells grid published')
 
 
 def main(args=None):

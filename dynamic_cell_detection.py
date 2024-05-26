@@ -13,9 +13,9 @@ P_OCCUPIED = 0.9
 P_FREE = 0.1
 LOG_ODDS_OCCUPIED = np.log(P_OCCUPIED / (1 - P_OCCUPIED))
 LOG_ODDS_FREE = np.log(P_FREE / (1 - P_FREE))
-LOG_ODDS_INIT = 0.5  # log-odds of 0.5 probability
-LOG_ODDS_MAX = 100.0
-LOG_ODDS_MIN = -100.0
+P_INIT = 0.5  # log-odds of 0.5 probability
+P_MAX = 0.99
+P_MIN = 0.01
 
 class LaserListenerNode(Node):
 
@@ -26,14 +26,15 @@ class LaserListenerNode(Node):
             '/laser_scan',
             self.listener_callback,
             10)
-        self.publisher = self.create_publisher(OccupancyGrid, 'occupancy_grid', 10)
+        self.grid_publisher = self.create_publisher(OccupancyGrid, 'occupancy_grid', 10)
+        self.change_publisher = self.create_publisher(OccupancyGrid, 'changed_cells_grid', 10)
         
         self.timer = self.create_timer(1.0, self.publish_occupancy_grid)
         
         # Initialize log-odds grid map with log-odds corresponding to 0.5 probability
-        self.grid_map = np.full((GRID_SIZE, GRID_SIZE), LOG_ODDS_INIT, dtype=np.float32)
-        self.memory_map = np.full((GRID_SIZE, GRID_SIZE), LOG_ODDS_INIT, dtype=np.float32)
-        self.door_area = []
+        self.grid_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
+        self.memory_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
+        self.change_map = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int8)
 
         # Origin of the grid map (assuming robot starts at the center)
         self.origin_x = GRID_SIZE // 2
@@ -51,8 +52,8 @@ class LaserListenerNode(Node):
         while True:
             if 0 <= x0 < GRID_SIZE and 0 <= y0 < GRID_SIZE:
                 if (x0 != x1 or y0 != y1):
-                    self.grid_map[x0, y0] += LOG_ODDS_FREE
-                    self.grid_map[x0, y0] = np.clip(self.grid_map[x0, y0], LOG_ODDS_MIN, LOG_ODDS_MAX)
+                    self.grid_map[x0, y0] -= (1 - 1 / (1 + np.exp(LOG_ODDS_FREE))) # = 0
+                    self.grid_map[x0, y0] = np.clip(self.grid_map[x0, y0], P_MIN, P_MAX)
             
             if x0 == x1 and y0 == y1:
                 break
@@ -65,15 +66,15 @@ class LaserListenerNode(Node):
                 err += dx
                 y0 += sy
 
-    # def check_for_cells(self):
-    #     differece_map = []
-    #     for new_row, memory_row in zip(self.grid_map, self.memory_map):
-    #         differece_row = [a - b for a,b in zip(new_row, memory_row)]
-    #         differece_map.append(differece_row)
-    #     for i in range(GRID_SIZE):
-    #         for j in range(GRID_SIZE):
-    #             if differece_map[i][j] < :
-    #                 self.door_area.append[(i,j)]
+    def check_for_changes(self):
+        for i in range(GRID_SIZE):
+            for j in range(GRID_SIZE):
+                current_prob = self.grid_map[i, j]
+                previous_prob = self.memory_map[i, j]
+                if previous_prob > 0.5 and current_prob < 0.5:
+                    self.change_map[i, j] = 100  # Mark the cell as changed
+                
+        self.memory_map = np.copy(self.grid_map)
 
 
     def listener_callback(self, msg):
@@ -92,10 +93,10 @@ class LaserListenerNode(Node):
             self.bresenham(self.origin_x, self.origin_y, grid_x, grid_y)
 
             if 0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE:
-                self.grid_map[grid_x, grid_y] += LOG_ODDS_OCCUPIED
-                self.grid_map[grid_x, grid_y] = np.clip(self.grid_map[grid_x, grid_y], LOG_ODDS_MIN, LOG_ODDS_MAX)
+                self.grid_map[grid_x, grid_y] += (1 - 1 / (1 + np.exp(LOG_ODDS_OCCUPIED))) # = 1
+                self.grid_map[grid_x, grid_y] = np.clip(self.grid_map[grid_x, grid_y], P_MIN, P_MAX)
         
-        # self.check_for_cells()
+        self.check_for_changes()
         self.last_scan_time = msg.header.stamp
 
 
@@ -103,7 +104,7 @@ class LaserListenerNode(Node):
         if self.last_scan_time is None:
             return  # No scan data received yet
 
-        flipped_map = np.flip(self.grid_map, axis=0) #np.rot90(self.grid_map)
+        flipped_map = np.flip(self.grid_map, axis=0)
         rotated_map = np.rot90(flipped_map, k=-1)
 
         # Convert log-odds map to occupancy grid
@@ -125,8 +126,36 @@ class LaserListenerNode(Node):
         occupancy_grid.data = (probabilities * 100).astype(np.int8).flatten().tolist()
 
         # Publish the occupancy grid
-        self.publisher.publish(occupancy_grid)
+        self.grid_publisher.publish(occupancy_grid)
         self.get_logger().info('Occupancy grid published')
+
+        # Publish the change map
+        self.publish_changed_cells_grid()
+
+
+    def publish_changed_cells_grid(self):
+        flipped_change_map = np.flip(self.change_map, axis=0)
+        rotated_change_map = np.rot90(flipped_change_map, k=-1)
+
+        change_grid = OccupancyGrid()
+        change_grid.header = Header()
+        change_grid.header.stamp = self.last_scan_time
+        change_grid.header.frame_id = 'sim_lidar'
+
+        change_grid.info.resolution = RESOLUTION
+        change_grid.info.width = GRID_SIZE
+        change_grid.info.height = GRID_SIZE
+        change_grid.info.origin.position.x = - (GRID_SIZE // 2) * RESOLUTION
+        change_grid.info.origin.position.y = - (GRID_SIZE // 2) * RESOLUTION
+        change_grid.info.origin.position.z = 0.0
+        change_grid.info.origin.orientation.w = 1.0  # no rotation
+
+        change_grid.data = rotated_change_map.flatten().tolist()
+
+        # Publish the change grid
+        self.change_publisher.publish(change_grid)
+        self.get_logger().info('Changed cells grid published')
+
 
 def main(args=None):
     rclpy.init(args=args)
