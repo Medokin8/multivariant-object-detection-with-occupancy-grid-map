@@ -24,7 +24,7 @@ class LaserListenerNode(Node):
         super().__init__('laser_listener_node')
         self.subscription = self.create_subscription(
             LaserScan,
-            '/laser_scan',
+            '/pioneer1/scan',
             self.listener_callback,
             10)
         
@@ -66,7 +66,7 @@ class LaserListenerNode(Node):
 
     def listener_callback(self, msg):
         for i, range in enumerate(msg.ranges):
-            if range < msg.range_min or range > msg.range_max:
+            if range < msg.range_min or range > msg.range_max or np.isnan(range):
                 continue  # ignore out-of-range values
 
             angle = msg.angle_min + i * msg.angle_increment
@@ -87,13 +87,13 @@ class LaserListenerNode(Node):
 
     def check_for_topic(self):
         topics = self.get_topic_names_and_types()
-        if not any('/laser_scan' in topic for topic, types in topics):
+        if not any('/pioneer1/scan' in topic for topic, types in topics):
             self.get_logger().info('/laser_scan topic not found, shutting down...')
             rclpy.shutdown()
 
     def save_memory_map(self):
         # Convert log-odds map to probabilities
-        folder_and_name = "simulated_maps/lab15_main_and_side_opened"
+        folder_and_name = "real_maps/lab15_side_opened"
         probabilities = 1 - 1 / (1 + np.exp(self.grid_map))
         np.save(folder_and_name + ".npy", probabilities)
         self.get_logger().info('Memory map saved to memory_map.npy')

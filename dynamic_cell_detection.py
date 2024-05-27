@@ -25,7 +25,7 @@ class LaserListenerNode(Node):
         super().__init__('laser_listener_node')
         self.subscription = self.create_subscription(
             LaserScan,
-            '/laser_scan',
+            '/pioneer1/scan',
             self.listener_callback,
             10)
         self.grid_publisher = self.create_publisher(OccupancyGrid, 'occupancy_grid', 10)
@@ -68,20 +68,93 @@ class LaserListenerNode(Node):
                 err += dx
                 y0 += sy
 
+    # def check_for_changes(self):
+    #     for i in range(GRID_SIZE):
+    #         for j in range(GRID_SIZE):
+    #             current_prob = self.grid_map[i, j]
+    #             previous_prob = self.memory_map[i, j]
+    #             if previous_prob > 0.5 and current_prob < 0.5:
+    #                 self.change_map[i, j] = 100  # Mark the cell as changed
+                
+    #     self.memory_map = np.copy(self.grid_map)
+    
+    # def flood_fill(self, x, y, visited):
+    #     stack = [(x, y)]
+    #     component = []
+
+    #     while stack:
+    #         cx, cy = stack.pop()
+    #         if 0 <= cx < GRID_SIZE and 0 <= cy < GRID_SIZE and not visited[cx, cy] and self.grid_map[cx, cy] < 0.5:
+    #             visited[cx, cy] = True
+    #             component.append((cx, cy))
+    #             neighbors = [(cx-1, cy), (cx+1, cy), (cx, cy-1), (cx, cy+1)]
+    #             for nx, ny in neighbors:
+    #                 stack.append((nx, ny))
+        
+    #     return component
+
+    # def is_line(self, component):
+    #     if len(component) < 5:
+    #         return False
+
+    #     xs = [x for x, y in component]
+    #     ys = [y for x, y in component]
+
+    #     if max(xs) - min(xs) + 1 == len(component) or max(ys) - min(ys) + 1 == len(component):
+    #         return True
+
+    #     return False
+
+    # def check_for_changes(self):
+    #     visited = np.zeros((GRID_SIZE, GRID_SIZE), dtype=bool)
+
+    #     for i in range(GRID_SIZE):
+    #         for j in range(GRID_SIZE):
+    #             if not visited[i, j] and self.grid_map[i, j] < 0.5:
+    #                 component = self.flood_fill(i, j, visited)
+    #                 if self.is_line(component):
+    #                     for x, y in component:
+    #                         self.change_map[x, y] = 100  # Mark the cell as changed
+                
+    #     self.memory_map = np.copy(self.grid_map)
+
     def check_for_changes(self):
+        visited = np.zeros((GRID_SIZE, GRID_SIZE), dtype=bool)
+        
+        def flood_fill(x, y):
+            stack = [(x, y)]
+            component = []
+            
+            while stack:
+                cx, cy = stack.pop()
+                if not (0 <= cx < GRID_SIZE and 0 <= cy < GRID_SIZE):
+                    continue
+                if visited[cx, cy]:
+                    continue
+                visited[cx, cy] = True
+                component.append((cx, cy))
+                
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nx, ny = cx + dx, cy + dy
+                    if 0 <= nx < GRID_SIZE and 0 <= ny < GRID_SIZE:
+                        if not visited[nx, ny] and self.memory_map[nx, ny] > 0.5 and self.grid_map[nx, ny] < 0.5:
+                            stack.append((nx, ny))
+            
+            return component
+
         for i in range(GRID_SIZE):
             for j in range(GRID_SIZE):
-                current_prob = self.grid_map[i, j]
-                previous_prob = self.memory_map[i, j]
-                if previous_prob > 0.5 and current_prob < 0.5:
-                    self.change_map[i, j] = 100  # Mark the cell as changed
-                
-        self.memory_map = np.copy(self.grid_map)
+                if not visited[i, j] and self.memory_map[i, j] > 0.5 and self.grid_map[i, j] < 0.5:
+                    component = flood_fill(i, j)
+                    if len(component) >= 5:
+                        for x, y in component:
+                            self.change_map[x, y] = 100  # Mark the cell as changed
 
+        self.memory_map = np.copy(self.grid_map)
 
     def listener_callback(self, msg):
         for i, range in enumerate(msg.ranges):
-            if range < msg.range_min or range > msg.range_max:
+            if range < msg.range_min or range > msg.range_max or np.isnan(range):
                 continue  # ignore out-of-range values
 
             angle = msg.angle_min + i * msg.angle_increment
