@@ -68,56 +68,6 @@ class LaserListenerNode(Node):
                 err += dx
                 y0 += sy
 
-    # def check_for_changes(self):
-    #     for i in range(GRID_SIZE):
-    #         for j in range(GRID_SIZE):
-    #             current_prob = self.grid_map[i, j]
-    #             previous_prob = self.memory_map[i, j]
-    #             if previous_prob > 0.5 and current_prob < 0.5:
-    #                 self.change_map[i, j] = 100  # Mark the cell as changed
-                
-    #     self.memory_map = np.copy(self.grid_map)
-    
-    # def flood_fill(self, x, y, visited):
-    #     stack = [(x, y)]
-    #     component = []
-
-    #     while stack:
-    #         cx, cy = stack.pop()
-    #         if 0 <= cx < GRID_SIZE and 0 <= cy < GRID_SIZE and not visited[cx, cy] and self.grid_map[cx, cy] < 0.5:
-    #             visited[cx, cy] = True
-    #             component.append((cx, cy))
-    #             neighbors = [(cx-1, cy), (cx+1, cy), (cx, cy-1), (cx, cy+1)]
-    #             for nx, ny in neighbors:
-    #                 stack.append((nx, ny))
-        
-    #     return component
-
-    # def is_line(self, component):
-    #     if len(component) < 5:
-    #         return False
-
-    #     xs = [x for x, y in component]
-    #     ys = [y for x, y in component]
-
-    #     if max(xs) - min(xs) + 1 == len(component) or max(ys) - min(ys) + 1 == len(component):
-    #         return True
-
-    #     return False
-
-    # def check_for_changes(self):
-    #     visited = np.zeros((GRID_SIZE, GRID_SIZE), dtype=bool)
-
-    #     for i in range(GRID_SIZE):
-    #         for j in range(GRID_SIZE):
-    #             if not visited[i, j] and self.grid_map[i, j] < 0.5:
-    #                 component = self.flood_fill(i, j, visited)
-    #                 if self.is_line(component):
-    #                     for x, y in component:
-    #                         self.change_map[x, y] = 100  # Mark the cell as changed
-                
-    #     self.memory_map = np.copy(self.grid_map)
-
     def check_for_changes(self):
         visited = np.zeros((GRID_SIZE, GRID_SIZE), dtype=bool)
         
