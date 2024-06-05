@@ -6,12 +6,15 @@ from scipy.ndimage import label
 DOORS_THRESHOLD = 0.49
 P_INIT = 0.5
 # MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_simulation"
-# MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_sim_rotated"
-MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_real"
+MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_sim_rotated"
+# MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors"
+# MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_real"
 
 # PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_doors.png"
-# PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_doors_rotated.png"
-PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/real_doors.png"
+PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_rotated_doors.png"
+# PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors.png"
+# PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/real_doors.png"
+
 TOLERANCE = 1e-6
 
 def load_maps_from_folder():
@@ -32,7 +35,6 @@ def init_result_map(maps):
         max_rows = max(max_rows, rows)
         max_columns = max(max_columns, columns)
     
-    # map = np.full((max_rows, max_columns), P_INIT, dtype=np.float32)
     map = np.zeros([max_rows,max_columns])
     return map 
 
@@ -50,10 +52,12 @@ def display_maps(maps):
     
     plt.show()
 
+
 def sanitize_map(map):
     map[np.isinf(map)] = 0
     map = np.nan_to_num(map)
     return map
+
 
 def segmentation(binary_mask):
     pattern = [[1,1,1],
@@ -69,6 +73,7 @@ def segmentation(binary_mask):
     
     return segments, labeled_array
 
+
 def remove_duplicates(list_of_arrays):
     seen = set()
     result = []
@@ -79,17 +84,88 @@ def remove_duplicates(list_of_arrays):
             result.append(array)
     return result
 
+
+# def divide_blobs(segment_list):
+#     segment_list = sorted(segment_list, key=len, reverse=True)
+#     final_blobs = []
+#     reduced_blobs = 0
+    
+#     for i, segment in enumerate(segment_list):
+#         is_subset = False
+#         for j, segment2 in enumerate(segment_list):
+#             if i != j and len(segment) <= len(segment2):
+#                 if not np.array_equal(segment, segment2):
+#                     num_of_points = sum((point == point2).all() for point in segment for point2 in segment2)
+                    
+#                     if num_of_points == len(segment):
+#                         is_subset = True
+#                         break
+        
+#         if not is_subset:
+#             final_blobs.append(segment)
+#             reduced_blobs += 1
+
+#     return final_blobs, reduced_blobs
+                
+
+def divide_blobs(segment_list):
+    final_blobs = []
+    reduced_blobs = 0
+    for i, segment in enumerate(segment_list):
+        for j, segment2 in enumerate(segment_list):
+            if i != j and len(segment) <= len(segment2):
+                if not np.array_equal(segment, segment2):
+
+                    # plt.figure(figsize=(15, 5))
+                    # plt.subplot(1,2,1)
+                    # back = np.zeros([100,100])
+                    # plt.imshow(back, cmap='gray_r')
+                    # for point in segment:
+                    #     plt.scatter(point[0], point[1], color="red", label="Segment1", s=10)
+
+                    # plt.subplot(1,2,2)
+                    # back = np.zeros([100,100])
+                    # plt.imshow(back, cmap='gray_r') 
+                    # for point in segment2:
+                    #     plt.scatter(point[0], point[1], color="blue", label="Segment2", s=10)
+                    # plt.legend()
+                    # plt.show()
+
+                    num_of_points = 0
+                    for point in segment:
+                        if any((point == point2).all() for point2 in segment2):
+                            num_of_points += 1
+
+                    if num_of_points == len(segment):
+                        final_blobs.append(segment)
+                        reduced_blobs += 1
+                        break
+                    
+                    
+                    if num_of_points == 0:
+                        final_blobs.append(segment)
+                        reduced_blobs += 1
+                        break
+
+                    # plt.figure(figsize=(15, 5))
+                    # back = np.zeros([100,100])
+                    # plt.imshow(back, cmap='gray_r')
+                    # cmap = plt.get_cmap('summer', len(final_blobs))
+                    # cmap.set_under('white')
+                    # colors = [cmap(i) for i in range(len(final_blobs))]
+                    # for i,segment in enumerate(final_blobs):
+                    #     for point in segment:
+                    #         plt.scatter(point[0], point[1], color=colors[i], label=f"Segment {i}", s=10)
+                    # plt.legend()
+                    # plt.show()
+    return final_blobs, reduced_blobs
+
+
 def main():
     maps = load_maps_from_folder()
     result_map = init_result_map(maps)
     background =np.copy(result_map)
-    display_maps(maps)
-
-    # plt.imshow(maps[0] - maps[1], cmap='gray_r')
-    # plt.title('??? map')
-    # plt.colorbar()
-    # plt.show()
-    # value = 1
+    # display_maps(maps)
 
     segments_list = []
     for map in maps:
@@ -134,7 +210,7 @@ def main():
         
                 segments, segment_labels = segmentation(binary_map)
 
-                cmap = plt.get_cmap('summer', len(segments))
+                cmap = plt.get_cmap('tab20', len(segments))
                 cmap.set_under('white')
                 colors = [cmap(i) for i in range(len(segments))]
 
@@ -177,7 +253,7 @@ def main():
 
                 segments, segment_labels = segmentation(result_map)
 
-                cmap = plt.get_cmap('summer', len(segments))
+                cmap = plt.get_cmap('tab20', len(segments))
                 cmap.set_under('white')
                 colors = [cmap(i) for i in range(len(segments))]
 
@@ -189,15 +265,52 @@ def main():
                 # plt.title('Map segments_list')
                 # plt.show()
 
-    print(len(segments_list))
     segments_list = remove_duplicates(segments_list)
-    print(len(segments_list))
+    # print(len(segments_list))
+
+    cmap = plt.get_cmap('tab20', len(segments_list))
+    cmap.set_under('white')
+    colors = [cmap(i) for i in range(len(segments_list))]
+
+    x,y = background.shape
+    back = np.zeros([x,y])
+
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1,2,1)
+    plt.imshow(back, cmap='gray_r')
+    plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    for i, segment in enumerate(segments_list):
+        x_coords, y_coords = zip(*segment)
+        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
+    plt.legend()
+
+    blobs, num_of_reduced_blobs = divide_blobs(segments_list)
+    print(len(blobs))
+    last_num_of_reduced_blobs = num_of_reduced_blobs + 1
+
+    while num_of_reduced_blobs != last_num_of_reduced_blobs:
+        last_num_of_reduced_blobs = num_of_reduced_blobs
+        blobs, num_of_reduced_blobs = divide_blobs(blobs)
+        print(len(blobs))
+
+    cmap = plt.get_cmap('tab20', len(blobs))
+    cmap.set_under('white')
+    colors = [cmap(i) for i in range(len(blobs))]
+
+    plt.subplot(1,2,2)
+    plt.imshow(back, cmap='gray_r')
+    plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    for i, segment in enumerate(blobs):
+        x_coords, y_coords = zip(*segment)
+        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Blob {i+1}', s=10)
+    plt.legend()
+    plt.show()
 
     plt.scatter(50, 50, color="red", label='Lidar', s=10)
 
     segments, segment_labels = segmentation(result_map)
 
-    cmap = plt.get_cmap('summer', len(segments))
+    cmap = plt.get_cmap('tab20', len(segments))
     cmap.set_under('white')
     colors = [cmap(i) for i in range(len(segments))]
 
@@ -208,6 +321,8 @@ def main():
         plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
     plt.title('DETECTED AREAS')
     plt.savefig(PATH_TO_SAVE)
-    plt.show()         
+    plt.show()
+
+
 if __name__ == "__main__":
     main()
