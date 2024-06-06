@@ -5,13 +5,13 @@ from scipy.ndimage import label
 
 DOORS_THRESHOLD = 0.49
 P_INIT = 0.5
-# MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_simulation"
-MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_sim_rotated"
+MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_simulation"
+# MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_sim_rotated"
 # MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors"
 # MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_real"
 
-# PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_doors.png"
-PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_rotated_doors.png"
+PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_doors.png"
+# PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/simulation_rotated_doors.png"
 # PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors.png"
 # PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/real_doors.png"
 
@@ -85,6 +85,19 @@ def remove_duplicates(list_of_arrays):
     return result
 
 
+def plot_segments(segment_list, plot_label):
+    plt.figure(figsize=(15, 5))
+    cmap = plt.get_cmap('tab20', len(segment_list))
+    cmap.set_under('white')
+    colors = [cmap(i) for i in range(len(segment_list))]
+    back = np.zeros([100,100])
+    plt.imshow(back, cmap='gray_r')
+    plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    for i, segment in enumerate(segment_list):
+        x_coords, y_coords = zip(*segment)
+        plt.scatter(y_coords, x_coords, color=colors[i], label=f'{plot_label} {i+1}', s=10)
+    plt.legend()
+    
 # def divide_blobs(segment_list):
 #     segment_list = sorted(segment_list, key=len, reverse=True)
 #     final_blobs = []
@@ -108,57 +121,87 @@ def remove_duplicates(list_of_arrays):
 #     return final_blobs, reduced_blobs
                 
 
+# def divide_blobs(segment_list):
+#     final_blobs = []
+#     reduced_blobs = 0
+#     for i, segment in enumerate(segment_list):
+#         for j, segment2 in enumerate(segment_list):
+#             if i != j and len(segment) <= len(segment2):
+#                 if not np.array_equal(segment, segment2):
+
+#                     num_of_points = 0
+#                     for point in segment:
+#                         if any((point == point2).all() for point2 in segment2):
+#                             num_of_points += 1
+
+#                     if num_of_points == len(segment):
+#                         final_blobs.append(segment)
+#                         reduced_blobs += 1
+#                         break
+                    
+#                     if num_of_points == 0:
+#                         final_blobs.append(segment)
+#                         reduced_blobs += 1
+#                         break
+
+#     return final_blobs, reduced_blobs
+
 def divide_blobs(segment_list):
-    final_blobs = []
-    reduced_blobs = 0
+
+    # Removal of segments witohout common points
+    segments_without_common_points =[]
+    segments_with_common_points = []
     for i, segment in enumerate(segment_list):
+        common_point_flag = False
         for j, segment2 in enumerate(segment_list):
-            if i != j and len(segment) <= len(segment2):
-                if not np.array_equal(segment, segment2):
+            if i != j :
+                for point in segment:
+                    for point2 in segment2:
+                        if (point == point2).all():
+                            common_point_flag = True
 
-                    # plt.figure(figsize=(15, 5))
-                    # plt.subplot(1,2,1)
-                    # back = np.zeros([100,100])
-                    # plt.imshow(back, cmap='gray_r')
-                    # for point in segment:
-                    #     plt.scatter(point[0], point[1], color="red", label="Segment1", s=10)
+        if common_point_flag is False:
+            segments_without_common_points.append(segment)
+        else:
+            segments_with_common_points.append(segment)
 
-                    # plt.subplot(1,2,2)
-                    # back = np.zeros([100,100])
-                    # plt.imshow(back, cmap='gray_r') 
-                    # for point in segment2:
-                    #     plt.scatter(point[0], point[1], color="blue", label="Segment2", s=10)
-                    # plt.legend()
-                    # plt.show()
+    # Removal of segments that are inside other segment
+    segments_with_common_points = sorted(segments_with_common_points, key=len, reverse=False)
+    lost_segments = []
+    for i, segment in enumerate(segments_with_common_points):
+        added_segment = False
+        for j, segment2 in enumerate(segments_with_common_points):
+            if i != j :
+                num_of_common = 0
+                for point in segment:
+                    for point2 in segment2:
+                        if (point == point2).all():
+                            num_of_common += 1
 
-                    num_of_points = 0
-                    for point in segment:
-                        if any((point == point2).all() for point2 in segment2):
-                            num_of_points += 1
+                if added_segment is False:
+                    if num_of_common == len(segment):
+                        local = np.copy(segment)
 
-                    if num_of_points == len(segment):
-                        final_blobs.append(segment)
-                        reduced_blobs += 1
-                        break
-                    
-                    
-                    if num_of_points == 0:
-                        final_blobs.append(segment)
-                        reduced_blobs += 1
-                        break
+                        segment_tuples = [tuple(point) for point in segment]
+                        diff_points = [point2 for point2 in segment2 if tuple(point2) not in segment_tuples]
 
-                    # plt.figure(figsize=(15, 5))
-                    # back = np.zeros([100,100])
-                    # plt.imshow(back, cmap='gray_r')
-                    # cmap = plt.get_cmap('summer', len(final_blobs))
-                    # cmap.set_under('white')
-                    # colors = [cmap(i) for i in range(len(final_blobs))]
-                    # for i,segment in enumerate(final_blobs):
-                    #     for point in segment:
-                    #         plt.scatter(point[0], point[1], color=colors[i], label=f"Segment {i}", s=10)
-                    # plt.legend()
-                    # plt.show()
-    return final_blobs, reduced_blobs
+                        if len(diff_points) > 1:
+                            segments_without_common_points.append(diff_points)
+                        else:
+                            diff_points_array = np.array(diff_points)
+                            local = np.append(local, diff_points_array, axis=0)
+                        
+                        segments_without_common_points.append(local)
+                        added_segment = True
+
+
+        if added_segment is False:
+            lost_segments.append(segment)
+
+    plot_segments(segments_without_common_points, "Seg")
+    plot_segments(lost_segments, "Lost")
+    plt.show()
+    return segments_without_common_points
 
 
 def main():
@@ -253,9 +296,9 @@ def main():
 
                 segments, segment_labels = segmentation(result_map)
 
-                cmap = plt.get_cmap('tab20', len(segments))
-                cmap.set_under('white')
-                colors = [cmap(i) for i in range(len(segments))]
+                # cmap = plt.get_cmap('tab20', len(segments))
+                # cmap.set_under('white')
+                # colors = [cmap(i) for i in range(len(segments))]
 
                 # plt.imshow(difference_map, cmap='gray_r')
                 # plt.scatter(50, 50, color="red", label='Lidar', s=10)
@@ -268,59 +311,61 @@ def main():
     segments_list = remove_duplicates(segments_list)
     # print(len(segments_list))
 
-    cmap = plt.get_cmap('tab20', len(segments_list))
-    cmap.set_under('white')
-    colors = [cmap(i) for i in range(len(segments_list))]
+    # cmap = plt.get_cmap('tab20', len(segments_list))
+    # cmap.set_under('white')
+    # colors = [cmap(i) for i in range(len(segments_list))]
 
-    x,y = background.shape
-    back = np.zeros([x,y])
+    # x,y = background.shape
+    # back = np.zeros([x,y])
 
-    plt.figure(figsize=(15, 5))
-    plt.subplot(1,2,1)
-    plt.imshow(back, cmap='gray_r')
-    plt.scatter(50, 50, color="red", label='Lidar', s=10)
-    for i, segment in enumerate(segments_list):
-        x_coords, y_coords = zip(*segment)
-        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
-    plt.legend()
+    # plt.figure(figsize=(15, 5))
+    # plt.subplot(1,2,1)
+    # plt.imshow(back, cmap='gray_r')
+    # plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    # for i, segment in enumerate(segments_list):
+    #     x_coords, y_coords = zip(*segment)
+    #     plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
+    # plt.legend()
 
-    blobs, num_of_reduced_blobs = divide_blobs(segments_list)
-    print(len(blobs))
-    last_num_of_reduced_blobs = num_of_reduced_blobs + 1
+    blobs = divide_blobs(segments_list)
+    # print(len(blobs))
+    # last_num_of_reduced_blobs = num_of_reduced_blobs + 1
 
-    while num_of_reduced_blobs != last_num_of_reduced_blobs:
-        last_num_of_reduced_blobs = num_of_reduced_blobs
-        blobs, num_of_reduced_blobs = divide_blobs(blobs)
-        print(len(blobs))
+    # # while num_of_reduced_blobs != last_num_of_reduced_blobs:
+    # #     last_num_of_reduced_blobs = num_of_reduced_blobs
+    # #     blobs, num_of_reduced_blobs = divide_blobs(blobs)
+    # #     print(len(blobs))
 
-    cmap = plt.get_cmap('tab20', len(blobs))
-    cmap.set_under('white')
-    colors = [cmap(i) for i in range(len(blobs))]
+    # cmap = plt.get_cmap('tab20', len(blobs))
+    # cmap.set_under('white')
+    # colors = [cmap(i) for i in range(len(blobs))]
 
-    plt.subplot(1,2,2)
-    plt.imshow(back, cmap='gray_r')
-    plt.scatter(50, 50, color="red", label='Lidar', s=10)
-    for i, segment in enumerate(blobs):
-        x_coords, y_coords = zip(*segment)
-        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Blob {i+1}', s=10)
-    plt.legend()
-    plt.show()
+    # plt.subplot(1,2,2)
+    # plt.imshow(back, cmap='gray_r')
+    # plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    # for i, segment in enumerate(blobs):
+    #     x_coords, y_coords = zip(*segment)
+    #     plt.scatter(y_coords, x_coords, color=colors[i], label=f'Blob {i+1}', s=10)
+    # plt.legend()
+    # plt.show()
+    plot_segments(blobs, "Blob")
 
-    plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    # plt.scatter(50, 50, color="red", label='Lidar', s=10)
 
     segments, segment_labels = segmentation(result_map)
 
-    cmap = plt.get_cmap('tab20', len(segments))
-    cmap.set_under('white')
-    colors = [cmap(i) for i in range(len(segments))]
+    # cmap = plt.get_cmap('tab20', len(segments))
+    # cmap.set_under('white')
+    # colors = [cmap(i) for i in range(len(segments))]
 
-    plt.imshow(background, cmap='gray_r')
-    plt.scatter(50, 50, color="red", label='Lidar', s=10)
-    for i, segment in enumerate(segments):
-        x_coords, y_coords = zip(*segment)
-        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
-    plt.title('DETECTED AREAS')
-    plt.savefig(PATH_TO_SAVE)
+    # plt.imshow(background, cmap='gray_r')
+    # plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    # for i, segment in enumerate(segments):
+    #     x_coords, y_coords = zip(*segment)
+    #     plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
+    # plt.title('DETECTED AREAS')
+    # plt.savefig(PATH_TO_SAVE)
+    plot_segments(segments, "Segment")
     plt.show()
 
 
