@@ -1,21 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-DOORS_THRESHOLD = -0.2
-name1 = 'lab15_glass_opened'
-name2 = 'lab15_glass_covered'
+DOORS_THRESHOLD = 0.49
+name1 = 'lab15_side_opened'
+name2 = 'lab15_main_opened'
+folder = 'two_states/'
 
-file1 = 'real_maps/' + name1 + '.npy'
-file2 = 'real_maps/' + name2 + '.npy'
-differenece_file_name = 'output_diff_maps_images/' + name1+ '_' + name2 + '.png'
-door_detected_file_name = 'output_doors_detected_images/' + name1+ '_' + name2 + '.png'
+file1 = 'tmp/' + name1 + '.npy'
+file2 = 'tmp/' + name2 + '.npy'
+differenece_file_name = 'output_diff_maps_images/' + folder + name1+ '_' + name2 + '.png.png'
+door_detected_file_name = 'output_doors_detected_images/' + folder + name1+ '_' + name2 + '.png.png'
 
 def find_lines(binary_mask, min_length=5):
     used_cells = set()
     lines = []
     labeled_mask = np.zeros_like(binary_mask)
-    current_label = 1
-
+    current_label = 0
+    
     def mark_used(cells, label):
         for cell in cells:
             used_cells.add(cell)
@@ -75,8 +76,7 @@ plt.title('Difference between occupancy grid maps')
 plt.colorbar()
 
 # Apply threshold to the difference array
-threshold = DOORS_THRESHOLD
-binary_mask = np.where(difference > threshold, 1, 0)
+binary_mask = np.where(abs(difference) > DOORS_THRESHOLD, 1, 0)
 
 plt.subplot(2, 2, 4)
 plt.imshow(binary_mask, cmap='gray')
@@ -98,7 +98,7 @@ for i, line in enumerate(lines):
     print(f"Line {i+1}: {line}")
 
 # Visualization with distinct colors for each line
-plt.imshow(difference, cmap='gray')
+plt.imshow(binary_mask, cmap='gray')
 # Define a colormap
 cmap = plt.get_cmap('summer', len(lines))
 cmap.set_under('white')

@@ -2,16 +2,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.ndimage import label
 
-DOORS_THRESHOLD = 0.48
-filename = 'output_results/results_data.txt'
-name2 = 'lab15_all2_closed'
-name1 = 'lab15_side2_opened'
-folder = 'real/'
+DOORS_THRESHOLD = 0.49
+# filename = 'output_results/results_data.txt'
+# name1 = 'lab15_main_opened'
+# name2 = 'lab15_side_opened'
+# folder = 'simulations/'
+
+# file1 = 'simulated_maps/' + name1 + '.npy'
+# file2 = 'simulated_maps/' + name2 + '.npy'
+# differenece_file_name = 'output_diff_maps_images/' + folder + name1+ '_' + name2 + '.png'
+# door_detected_file_name = 'output_doors_detected_images/' + folder + name1+ '_' + name2 + '.png'
+
+filename = 'output_results/results_data_3.txt'
+name1 = 'lab15_main_opened'
+name2 = 'lab15_side_opened'
+folder = 'tmp/'
 
 file1 = 'real_maps/' + name1 + '.npy'
 file2 = 'real_maps/' + name2 + '.npy'
-differenece_file_name = 'output_diff_maps_images/' + folder + name1+ '_' + name2 + '.png.png'
-door_detected_file_name = 'output_doors_detected_images/' + folder + name1+ '_' + name2 + '.png.png'
+differenece_file_name = 'output_diff_maps_images/' + folder + name1+ '_' + name2 + '.png'
+door_detected_file_name = 'output_doors_detected_images/' + folder + name1+ '_' + name2 + '.png'
+
 
 # Load .npy files
 data1 = np.load(file1)
@@ -34,9 +45,33 @@ plt.colorbar()
 
 # Compute and visualize the difference
 difference = data1 - data2
+rows, columns = data1.shape
+binary_mask2 = np.empty([rows, columns])
+for row in range(rows):
+    for column in range(columns):
+        # row=76
+        # column=80
+        d1 = data1[row,column]
+        d2 = data2[row,column]
+        difference_value = abs(difference[row, column])
+        tolerance = 1e-6
+        if difference_value <= 0.5:
+            if abs(data1[row, column] - 0.01) < tolerance and abs(data2[row, column] - 0.5) < tolerance:
+                binary_mask2[row, column] = 0
+            elif abs(data1[row, column] - 0.5) < tolerance and abs(data2[row, column] - 0.01) < tolerance:
+                binary_mask2[row, column] = 0   
+            elif abs(data1[row, column] - 0.5) < tolerance and abs(data2[row, column] - 0.99) < tolerance:
+                binary_mask2[row, column] = 1
+            elif abs(data1[row, column] - 0.99) < tolerance and abs(data2[row, column] - 0.5) < tolerance:
+                binary_mask2[row, column] = 1
+            else:
+                binary_mask2[row, column] = 0
+        else:
+            binary_mask2[row, column] = 1
+
 plt.subplot(2, 2, 3)
 plt.scatter(50, 50, color="red", label='Lidar', s=10)
-plt.imshow(difference, cmap='gray_r')
+plt.imshow(binary_mask2, cmap='gray_r')
 plt.title('Difference between occupancy grid maps')
 plt.colorbar()
 

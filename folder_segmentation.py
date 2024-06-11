@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import label
 
 DOORS_THRESHOLD = 0.49
-P_INIT = 0.5
+TOLERANCE = 1e-6
+
 # MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_simulation"
 MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/lab15_sim_rotated"
 # MAPS_FOLDER = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors"
@@ -15,7 +16,6 @@ PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentat
 # PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/glass_doors.png"
 # PATH_TO_SAVE = "/home/nikodem/Documents/door-detection-with-ogm/folder_segmentation/real_doors.png"
 
-TOLERANCE = 1e-6
 
 def load_maps_from_folder():
     maps = []
@@ -63,6 +63,7 @@ def segmentation(binary_mask):
     pattern = [[1,1,1],
                [1,1,1],
                [1,1,1]]
+    
     labeled_array, num_features = label(binary_mask, pattern)
     segments = []
     
@@ -99,54 +100,6 @@ def plot_segments(segment_list, plot_label):
     plt.legend()
     
 
-# def divide_blobs(segment_list):
-#     # Removal of segments witohout common points
-#     segments_without_common_points =[]
-#     segments_with_common_points = []
-#     for i, segment in enumerate(segment_list):
-#         common_point_flag = False
-#         for j, segment2 in enumerate(segment_list):
-#             if i != j :
-#                 for point in segment:
-#                     for point2 in segment2:
-#                         if (point == point2).all():
-#                             common_point_flag = True
-
-#         if common_point_flag is False:
-#             segments_without_common_points.append(segment)
-#         else:
-#             segments_with_common_points.append(segment)
-
-#     print(segments_without_common_points)
-#     print(segments_with_common_points)
-#     plot_segments(segments_without_common_points, "A")
-#     plt.show()
-
-#     # Removal of segments that are inside other segmen
-#     lost_segments = []
-#     for i, segment in enumerate(segments_with_common_points):
-#         for j, segment2 in enumerate(segments_with_common_points):
-#             if i != j :
-#                 num_of_common = 0
-#                 for point in segment:
-#                     for point2 in segment2:
-#                         if (point == point2).all():
-#                             num_of_common += 1
-
-#                 if num_of_common == len(segment):
-#                     local = np.copy(segment)
-#                     segments_without_common_points.append(local)
-    
-#     print(segments_without_common_points)
-#     plot_segments(segments_without_common_points, "A")
-#     plt.show()
-
-#     print(lost_segments)
-#     plot_segments(lost_segments, "L")
-#     plt.show()
-
-#     return segments_without_common_points
-
 def find_most_similar_segment(unique_point, source_segment, segments):
     # Compute similarity based on the number of common points
     source_points_set = set(tuple(point) for point in source_segment)
@@ -159,6 +112,7 @@ def find_most_similar_segment(unique_point, source_segment, segments):
             max_similarity = similarity
             most_similar_segment = segment
     return most_similar_segment
+
 
 def divide_blobs(segment_list):
     included_points = set()
@@ -294,6 +248,20 @@ def main():
 
     blobs = divide_blobs(segments_list)
     plot_segments(blobs, "Segment")
+    plt.show()
+
+    cmap = plt.get_cmap('tab20', len(blobs))
+    cmap.set_under('white')
+    colors = [cmap(i) for i in range(len(blobs))]
+
+    plt.imshow(background, cmap='gray_r')
+    plt.scatter(50, 50, color="red", label='Lidar', s=10)
+    for i, segment in enumerate(blobs):
+        x_coords, y_coords = zip(*segment)
+        plt.scatter(y_coords, x_coords, color=colors[i], label=f'Segment {i+1}', s=10)
+    plt.title('DETECTED AREAS')
+    plt.legend()
+    plt.savefig(PATH_TO_SAVE)
     plt.show()
 
 if __name__ == "__main__":
