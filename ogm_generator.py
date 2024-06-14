@@ -2,40 +2,36 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 import numpy as np
-import os
 
 GRID_SIZE = 100
-RESOLUTION = 0.1
+CELL_SIZE = 0.1
+ROTATION = 0
 
-# Parameters for log-odds
+P_INIT = 0.5
 P_OCCUPIED = 0.9
 P_FREE = 0.1
-LOG_ODDS_OCCUPIED = np.log(P_OCCUPIED / (1 - P_OCCUPIED))
-LOG_ODDS_FREE = np.log(P_FREE / (1 - P_FREE))
-P_INIT = 0.5  # log-odds of 0.5 probability
 P_MAX = 0.99
 P_MIN = 0.01
+LOG_ODDS_OCCUPIED = np.log(P_OCCUPIED / (1 - P_OCCUPIED))
+LOG_ODDS_FREE = np.log(P_FREE / (1 - P_FREE))
+
+TOPIC = "/pioneer1/scan"
+
 
 class LaserListenerNode(Node):
 
     def __init__(self):
-        super().__init__('laser_listener_node')
-        self.subscription = self.create_subscription(
-            LaserScan,
-            '/pioneer1/scan',
-            self.listener_callback,
-            10)
-        
+        super().__init__("laser_listener_node")
+        self.subscription = self.create_subscription(LaserScan, TOPIC, self.listener_callback, 10)
+
         self.timer = self.create_timer(1.0, self.check_for_topic)
 
-        # Initialize log-odds grid map with log-odds corresponding to 0.5 probability
         self.grid_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
         self.memory_map = np.full((GRID_SIZE, GRID_SIZE), P_INIT, dtype=np.float32)
 
-        # Origin of the grid map (assuming robot starts at the center)
         self.origin_x = GRID_SIZE // 2
         self.origin_y = GRID_SIZE // 2
-        
+
         self.last_scan_time = None
 
     def bresenham(self, x0, y0, x1, y1):
@@ -47,12 +43,12 @@ class LaserListenerNode(Node):
 
         while True:
             if 0 <= x0 < GRID_SIZE and 0 <= y0 < GRID_SIZE:
-                if (x0 != x1 or y0 != y1):
-                    probability =  np.log(self.grid_map[x0, y0]/(1-self.grid_map[x0, y0]))
+                if x0 != x1 or y0 != y1:
+                    probability = np.log(self.grid_map[x0, y0] / (1 - self.grid_map[x0, y0]))
                     new_probability = probability + LOG_ODDS_FREE
-                    self.grid_map[x0, y0] = (1 - 1 / (1 + np.exp(new_probability)))
+                    self.grid_map[x0, y0] = 1 - 1 / (1 + np.exp(new_probability))
                     self.grid_map[x0, y0] = np.clip(self.grid_map[x0, y0], P_MIN, P_MAX)
-            
+
             if x0 == x1 and y0 == y1:
                 break
 
@@ -67,41 +63,39 @@ class LaserListenerNode(Node):
     def listener_callback(self, msg):
         for i, range in enumerate(msg.ranges):
             if range < msg.range_min or range > msg.range_max or np.isnan(range):
-                continue  # ignore out-of-range values
+                continue
 
             angle = msg.angle_min + i * msg.angle_increment
-            rotation = 0 #np.pi*3/4
-            x = range * np.cos(angle+rotation)
-            y = range * np.sin(angle+rotation)
+            x = range * np.cos(angle + ROTATION)
+            y = range * np.sin(angle + ROTATION)
 
-            grid_x = int(self.origin_x + x / RESOLUTION)
-            grid_y = int(self.origin_y + y / RESOLUTION)
+            grid_x = int(self.origin_x + x / CELL_SIZE)
+            grid_y = int(self.origin_y + y / CELL_SIZE)
 
-            # Apply Bresenham's line algorithm to update free cells along the ray
             self.bresenham(self.origin_x, self.origin_y, grid_x, grid_y)
 
             if 0 <= grid_x < GRID_SIZE and 0 <= grid_y < GRID_SIZE:
-                old_probability =  np.log(self.grid_map[grid_x, grid_y]/(1-self.grid_map[grid_x, grid_y]))
+                old_probability = np.log(self.grid_map[grid_x, grid_y] / (1 - self.grid_map[grid_x, grid_y]))
                 new_probability = old_probability + LOG_ODDS_OCCUPIED
-                self.grid_map[grid_x, grid_y] = (1 - 1 / (1 + np.exp(new_probability)))
+                self.grid_map[grid_x, grid_y] = 1 - 1 / (1 + np.exp(new_probability))
                 self.grid_map[grid_x, grid_y] = np.clip(self.grid_map[grid_x, grid_y], P_MIN, P_MAX)
-        
+
         self.last_scan_time = msg.header.stamp
 
     def check_for_topic(self):
         topics = self.get_topic_names_and_types()
-        # if not any('/laser_scan' in topic for topic, types in topics):
-        if not any('/pioneer1/scan' in topic for topic, types in topics):
-            self.get_logger().info('/laser_scan topic not found, shutting down...')
+        if not any(TOPIC in topic for topic, types in topics):
+            self.get_logger().info("/laser_scan topic not found, shutting down...")
             rclpy.shutdown()
 
     def save_memory_map(self):
         folder_and_name = "folder_segmentation/lab15_real/lab15_side_opened"
-        probabilities = self.grid_map 
+        probabilities = self.grid_map
         np.save(folder_and_name + ".npy", probabilities)
-        self.get_logger().info('Memory map saved to memory_map.npy')
+        self.get_logger().info("Memory map saved to memory_map.npy")
         np.savetxt(folder_and_name + ".csv", probabilities, delimiter=",")
-        self.get_logger().info('Memory map saved to memory_map.csv')
+        self.get_logger().info("Memory map saved to memory_map.csv")
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -112,9 +106,10 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        node.save_memory_map()  # Save the memory map before shutting down
+        node.save_memory_map()
         node.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
