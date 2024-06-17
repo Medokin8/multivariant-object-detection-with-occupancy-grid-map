@@ -8,7 +8,7 @@ from scipy.ndimage import label
 
 GRID_SIZE = 100
 CELL_SIZE = 0.1
-ROTATION = 0
+ROTATION = 3 / 4 * np.pi
 
 P_INIT = 0.5
 P_OCCUPIED = 0.9
@@ -22,12 +22,11 @@ MIN_NUMBER_OF_CELLS = 3
 P_THRESHOLD = 0.49
 TOLERANCE = 1e-6
 
-TOPIC = "/pioneer1/scan"
-FRAME_ID = "pioneer1/laser"
+TOPIC = "/laser_scan"
+FRAME_ID = "sim_lidar"
 
 
 class LaserListenerNode(Node):
-
     def __init__(self):
         super().__init__("laser_listener_node")
         self.subscription = self.create_subscription(
@@ -59,7 +58,6 @@ class LaserListenerNode(Node):
             P_INIT,
             dtype=np.float32,
         )
-        self.change_map = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int8)
         self.blobs = np.zeros((GRID_SIZE, GRID_SIZE), dtype=np.int8)
 
         self.segments_list = []
@@ -201,10 +199,6 @@ class LaserListenerNode(Node):
         segments, _ = self.segmentation(binary_map)
 
         for segment in segments:
-            for point in segment:
-                if self.change_map[point[0], point[1]] == 0:
-                    self.change_map[point[0], point[1]] = 1
-
             flag = True
             for noted_segment in self.segments_list:
                 if np.array_equal(
@@ -224,7 +218,6 @@ class LaserListenerNode(Node):
             for x, y in segment:
                 self.blobs[x, y] = segment_id
 
-        print(len(detected_objects))
         self.memory_map = np.copy(self.grid_map)
 
     def listener_callback(self, msg):
@@ -280,7 +273,7 @@ class LaserListenerNode(Node):
         occupancy_grid.header.stamp = self.last_scan_time
         occupancy_grid.header.frame_id = FRAME_ID
 
-        occupancy_grid.info.CELL_SIZE = CELL_SIZE
+        occupancy_grid.info.resolution = CELL_SIZE
         occupancy_grid.info.width = GRID_SIZE
         occupancy_grid.info.height = GRID_SIZE
         occupancy_grid.info.origin.position.x = -(GRID_SIZE // 2) * CELL_SIZE
@@ -307,7 +300,7 @@ class LaserListenerNode(Node):
         change_grid.header.stamp = self.last_scan_time
         change_grid.header.frame_id = FRAME_ID
 
-        change_grid.info.CELL_SIZE = CELL_SIZE
+        change_grid.info.resolution = CELL_SIZE
         change_grid.info.width = GRID_SIZE
         change_grid.info.height = GRID_SIZE
         change_grid.info.origin.position.x = -(GRID_SIZE // 2) * CELL_SIZE
@@ -320,6 +313,16 @@ class LaserListenerNode(Node):
 
         self.change_publisher.publish(change_grid)
         self.get_logger().info("Detected objects published")
+
+        points_by_value = {}
+        blob_copy = np.copy(self.blobs)
+        unique_values = np.unique(blob_copy[blob_copy != 0])
+        for value in unique_values:
+            points = np.argwhere(blob_copy == value)
+            points_by_value[value] = points.tolist()
+
+        for idx, cells in points_by_value.items():
+            self.get_logger().info(f"Segemnt  {idx}: {cells}")
 
 
 def main(args=None):

@@ -8,8 +8,8 @@ TOLERANCE = 1e-6
 MIN_NUMBER_OF_CELLS = 3
 
 
-MAPS_FOLDER = "tmp/"
-PATH_TO_SAVE = "tmp/"
+MAPS_FOLDER = ""
+PATH_TO_SAVE = ""
 
 
 def load_maps_from_folder():
@@ -66,7 +66,11 @@ def display_maps(maps):
         cbar.set_ticks(ticks)
         cbar.set_ticklabels(tick_labels)
 
-        plt.savefig(PATH_TO_SAVE + "maps/" + "map_" + str(i) + ".png")
+        plt.savefig(
+            PATH_TO_SAVE + "maps/" + "map_" + str(i) + ".png",
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         plt.close()
         plt.clf()
         i += 1
@@ -176,7 +180,8 @@ def main():
         for point in np.argwhere(reflections == 1):
             background[point[0], point[1]] = 1
 
-        for int_map2, map2 in enumerate(maps):
+        for int_map2 in range(int_map1 + 1, len(maps)):
+            map2 = maps[int_map2]
             if (map == map2).all():
                 continue
             else:
@@ -283,6 +288,9 @@ def main():
                     ]
                 )
 
+                if not os.path.exists((PATH_TO_SAVE + "comparison_maps/")):
+                    os.makedirs((PATH_TO_SAVE + "comparison_maps/"))
+
                 plt.savefig(
                     PATH_TO_SAVE
                     + "comparison_maps/"
@@ -290,7 +298,9 @@ def main():
                     + str(int_map1 + 1)
                     + "_"
                     + str(int_map2 + 1)
-                    + ".png"
+                    + ".png",
+                    bbox_inches="tight",
+                    pad_inches=0.1,
                 )
                 # plt.show()
                 plt.close()
@@ -333,18 +343,17 @@ def main():
                         label=f"Segment {i+1}",
                         s=10,
                     )
-                plt.title(
-                    f"Detected segments on difference map \n (Map {int_map1+1} - Map {int_map2+1})"
-                )
                 plt.legend(loc="upper right")
                 plt.savefig(
                     PATH_TO_SAVE
                     + f"segment_maps/segemnts_{int_map1+1}_{int_map2+1}/"
-                    + "detected_segments"
+                    + "detected_segments_on_difference_map_"
                     + str(int_map1 + 1)
                     + "_"
                     + str(int_map2 + 1)
-                    + ".png"
+                    + ".png",
+                    bbox_inches="tight",
+                    pad_inches=0.1,
                 )
                 plt.close()
                 plt.clf()
@@ -375,16 +384,17 @@ def main():
                     s=10,
                 )
                 plt.imshow(result_map, cmap="gray_r")
-                plt.title("Output map")
                 plt.legend(loc="upper right")
                 plt.savefig(
                     PATH_TO_SAVE
                     + f"segment_maps/segemnts_{int_map1+1}_{int_map2+1}/"
-                    + "result_map"
+                    + "result_map_"
                     + str(int_map1 + 1)
                     + "_"
                     + str(int_map2 + 1)
-                    + ".png"
+                    + ".png",
+                    bbox_inches="tight",
+                    pad_inches=0.1,
                 )
                 plt.close()
                 plt.clf()
@@ -412,16 +422,17 @@ def main():
                         label=f"Segment {i+1}",
                         s=10,
                     )
-                plt.title("Detected segments on result map")
                 plt.legend(loc="upper right")
                 plt.savefig(
                     PATH_TO_SAVE
                     + f"segment_maps/segemnts_{int_map1+1}_{int_map2+1}/"
-                    + "segment_map"
+                    + "detected_segemnts_on_result_map_"
                     + str(int_map1 + 1)
                     + "_"
                     + str(int_map2 + 1)
-                    + ".png"
+                    + ".png",
+                    bbox_inches="tight",
+                    pad_inches=0.1,
                 )
                 plt.close()
                 plt.clf()
@@ -430,17 +441,26 @@ def main():
         os.makedirs((PATH_TO_SAVE + "object_detection/"))
 
     plot_segments(segments_list, "Segment")
-    plt.title(f"All detedcted segments based on maps 1:{len(maps)}")
-    plt.savefig(PATH_TO_SAVE + "object_detection/segment_list_map.png")
+    plt.savefig(
+        PATH_TO_SAVE
+        + f"object_detection/all_detected_segment_1:{len(maps)}.png",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
     plt.close()
     plt.clf()
 
     blobs = divide_blobs(segments_list)
     plot_segments(blobs, "Segment")
-    plt.title(f"Filtered segments based on maps 1:{len(maps)}")
-    plt.savefig(PATH_TO_SAVE + "object_detection/blobs.png")
+    plt.savefig(
+        PATH_TO_SAVE + f"object_detection/filtered_segments.png",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
     plt.close()
     plt.clf()
+    for idx, blob in enumerate(blobs):
+        print(f"Object {idx}: {blob}")
 
     cmap = plt.get_cmap("tab20", len(blobs))
     cmap.set_under("white")
@@ -457,9 +477,12 @@ def main():
             label=f"Segment {i+1}",
             s=10,
         )
-    plt.title(f"Detected Objects based on maps 1:{len(maps)}")
     plt.legend(loc="upper right")
-    plt.savefig(PATH_TO_SAVE + "object_detection/objects_detected.png")
+    plt.savefig(
+        PATH_TO_SAVE + "object_detection/objects_detected.png",
+        bbox_inches="tight",
+        pad_inches=0.1,
+    )
     plt.close()
     plt.clf()
 
